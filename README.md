@@ -18,6 +18,7 @@ The dashboard shows:
 - Recent check runs and classified emails
 - Your Google Sheets trigger URL
 - Run Check Now button
+- iPhone home-screen push notifications
 
 Example:
 
@@ -54,6 +55,15 @@ function checkRecruiterMail() {
 ```
 
 Set a time-driven trigger, like every 5 to 15 minutes, on `checkRecruiterMail`.
+
+## iPhone notifications
+
+On iPhone, open the Render URL in Safari, share it, and choose **Add to Home Screen**. Open Mail Checker from the new Home Screen icon, then tap **Enable Notifications**.
+
+Notification behavior:
+- Manual **Run Check Now** sends a phone notification after every run.
+- Google Apps Script `/check` sends a phone notification only when important mail is found.
+- Email alerts still work through `ALERT_EMAIL`.
 
 ## How to verify it is working
 

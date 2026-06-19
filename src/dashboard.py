@@ -20,7 +20,7 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
                 <td>{esc(item.get('processed_at'))}</td>
             </tr>"""
     else:
-        email_rows = '<tr><td colspan="6" class="empty">No emails processed yet. Run a check to get started.</td></tr>'
+        email_rows = '<tr><td colspan="6" class="empty">No emails processed yet.</td></tr>'
 
     run_rows = ""
     if recent_runs:
@@ -43,110 +43,274 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
     last_run_status = last_run.get("status") or "waiting"
     trigger_url = settings_info.get("trigger_url", "")
 
-    run_button = """
-        <button class="btn" id="runBtn" onclick="runCheck()">Run Check Now</button>
-        <p id="runStatus" class="hint"></p>
-        """
-
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mail Checker Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f5f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mail Checker">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/app-icon.svg">
+  <title>Mail Checker</title>
   <style>
     :root {{
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --panel-2: #243044;
-      --text: #e7eef8;
-      --muted: #93a4bb;
-      --accent: #4f8cff;
-      --green: #34d399;
-      --yellow: #fbbf24;
-      --red: #f87171;
-      --border: #2d3a4f;
+      --bg: #f5f5f7;
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: #ffffff;
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --line: rgba(0, 0, 0, 0.08);
+      --blue: #0071e3;
+      --green: #248a3d;
+      --red: #d70015;
+      --shadow: 0 18px 44px rgba(0, 0, 0, 0.08);
     }}
     * {{ box-sizing: border-box; }}
+    html {{ background: var(--bg); }}
     body {{
       margin: 0;
-      font-family: Segoe UI, system-ui, sans-serif;
-      background: linear-gradient(180deg, #0b1017 0%, #121926 100%);
-      color: var(--text);
       min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(0, 113, 227, 0.14), transparent 34rem),
+        linear-gradient(180deg, #fbfbfd 0%, var(--bg) 45%, #efeff4 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
     }}
-    .wrap {{ max-width: 1100px; margin: 0 auto; padding: 28px 20px 48px; }}
-    .hero {{
-      display: flex; justify-content: space-between; align-items: center; gap: 16px;
-      margin-bottom: 24px; flex-wrap: wrap;
+    .wrap {{
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: max(22px, env(safe-area-inset-top)) 18px 44px;
     }}
-    h1 {{ margin: 0; font-size: 1.8rem; }}
-    .subtitle {{ color: var(--muted); margin-top: 6px; }}
+    .topbar {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }}
+    .brand {{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }}
+    .appicon {{
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: #111;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow);
+      flex: 0 0 auto;
+    }}
+    .appicon::before {{
+      content: "";
+      width: 25px;
+      height: 16px;
+      border-radius: 5px;
+      background: #fff;
+      box-shadow: 10px -9px 0 -4px #30d158;
+    }}
+    h1 {{
+      margin: 0;
+      font-size: clamp(1.55rem, 4vw, 2.45rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }}
+    .subtitle {{
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+    }}
     .status-pill {{
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--panel); border: 1px solid var(--border);
-      padding: 10px 14px; border-radius: 999px; font-size: 0.92rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--muted);
+      white-space: nowrap;
     }}
-    .dot {{ width: 10px; height: 10px; border-radius: 50%; background: var(--green); }}
-    .grid {{
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 14px; margin-bottom: 22px;
+    .dot {{
+      width: 9px;
+      height: 9px;
+      border-radius: 99px;
+      background: var(--green);
     }}
-    .card {{
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 14px; padding: 18px;
+    .hero {{
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 18px;
+      margin-bottom: 18px;
     }}
-    .card h3 {{ margin: 0 0 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }}
-    .card .num {{ font-size: 1.8rem; font-weight: 700; }}
-    .panel {{
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 14px; padding: 18px; margin-bottom: 18px;
+    .panel, .card {{
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
     }}
-    .panel h2 {{ margin: 0 0 14px; font-size: 1.1rem; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 0.92rem; }}
-    th, td {{ padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }}
-    th {{ color: var(--muted); font-weight: 600; }}
-    .badge {{
-      display: inline-block; padding: 4px 8px; border-radius: 999px;
-      font-size: 0.75rem; font-weight: 700;
+    .panel {{ padding: 18px; margin-bottom: 18px; }}
+    .primary {{
+      padding: clamp(20px, 4vw, 34px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 248px;
     }}
-    .badge.alert {{ background: rgba(52, 211, 153, 0.15); color: var(--green); }}
-    .badge.skip {{ background: rgba(147, 164, 187, 0.15); color: var(--muted); }}
-    .badge.ok {{ background: rgba(52, 211, 153, 0.15); color: var(--green); }}
-    .badge.bad {{ background: rgba(248, 113, 113, 0.15); color: var(--red); }}
-    .empty {{ color: var(--muted); text-align: center; }}
-    .meta {{ color: var(--muted); line-height: 1.7; }}
-    code {{
-      background: var(--panel-2); padding: 2px 6px; border-radius: 6px;
-      word-break: break-all;
+    .primary h2 {{
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2rem, 7vw, 4.8rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }}
+    .actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+      align-items: center;
     }}
     .btn {{
-      background: var(--accent); color: white; border: none;
-      padding: 12px 18px; border-radius: 10px; font-weight: 700; cursor: pointer;
+      min-height: 44px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 18px;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.95rem;
     }}
-    .btn:hover {{ filter: brightness(1.08); }}
-    .hint {{ color: var(--muted); margin-top: 10px; min-height: 20px; }}
-    .actions {{ margin-top: 8px; }}
+    .btn.secondary {{
+      background: #e8e8ed;
+      color: var(--text);
+    }}
+    .btn:disabled {{
+      cursor: not-allowed;
+      opacity: 0.58;
+    }}
+    .hint {{
+      width: 100%;
+      min-height: 22px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }}
+    .grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    .card {{ padding: 18px; min-height: 118px; }}
+    .card h3 {{
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }}
+    .num {{
+      font-size: clamp(1.8rem, 6vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1;
+    }}
+    h2 {{
+      margin: 0 0 14px;
+      font-size: 1.08rem;
+      letter-spacing: 0;
+    }}
+    .meta {{
+      color: var(--muted);
+      line-height: 1.8;
+      overflow-wrap: anywhere;
+    }}
+    code {{
+      display: inline-block;
+      max-width: 100%;
+      background: #f0f0f3;
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: #333;
+      overflow-wrap: anywhere;
+    }}
+    .table-wrap {{ overflow-x: auto; }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      min-width: 720px;
+    }}
+    th, td {{
+      padding: 11px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }}
+    th {{ color: var(--muted); font-weight: 700; }}
+    .badge {{
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+    }}
+    .badge.alert, .badge.ok {{ background: rgba(36, 138, 61, 0.12); color: var(--green); }}
+    .badge.skip {{ background: rgba(110, 110, 115, 0.14); color: var(--muted); }}
+    .badge.bad {{ background: rgba(215, 0, 21, 0.12); color: var(--red); }}
+    .empty {{ color: var(--muted); text-align: center; }}
+    @media (max-width: 760px) {{
+      .topbar, .hero {{ display: block; }}
+      .status-pill {{ margin-top: 16px; }}
+      .primary {{ min-height: 276px; margin-bottom: 14px; }}
+      .grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .card {{ min-height: 104px; padding: 14px; }}
+      .wrap {{ padding-left: 14px; padding-right: 14px; }}
+    }}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="hero">
-      <div>
-        <h1>Mail Checker Agent</h1>
-        <p class="subtitle">Monitors recruiter interest and skips generic job auto-replies.</p>
+    <header class="topbar">
+      <div class="brand">
+        <div class="appicon" aria-hidden="true"></div>
+        <div>
+          <h1>Mail Checker</h1>
+          <p class="subtitle">Today-only job alerts, filtered by AI.</p>
+        </div>
       </div>
       <div class="status-pill"><span class="dot"></span> Agent online</div>
-    </div>
+    </header>
 
-    <div class="grid">
-      <div class="card"><h3>Total Checks</h3><div class="num">{esc(stats.get('total_runs', 0))}</div></div>
-      <div class="card"><h3>Alerts Sent</h3><div class="num">{esc(stats.get('total_alerts', 0))}</div></div>
-      <div class="card"><h3>Emails Processed</h3><div class="num">{esc(stats.get('total_emails', 0))}</div></div>
-      <div class="card"><h3>Auto-Skipped</h3><div class="num">{esc(stats.get('total_skipped', 0))}</div></div>
-    </div>
+    <section class="hero">
+      <div class="panel primary">
+        <div>
+          <h2>Recruiter signals, without the inbox noise.</h2>
+        </div>
+        <div class="actions">
+          <button class="btn" id="runBtn" onclick="runCheck()">Run Check Now</button>
+          <button class="btn secondary" id="notifyBtn" onclick="enableNotifications()">Enable Notifications</button>
+          <p id="runStatus" class="hint"></p>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card"><h3>Total Checks</h3><div class="num">{esc(stats.get('total_runs', 0))}</div></div>
+        <div class="card"><h3>Alerts Sent</h3><div class="num">{esc(stats.get('total_alerts', 0))}</div></div>
+        <div class="card"><h3>Processed</h3><div class="num">{esc(stats.get('total_emails', 0))}</div></div>
+        <div class="card"><h3>Skipped</h3><div class="num">{esc(stats.get('total_skipped', 0))}</div></div>
+      </div>
+    </section>
 
-    <div class="panel">
+    <section class="panel">
       <h2>Agent Config</h2>
       <div class="meta">
         <div><strong>Monitored inbox:</strong> {esc(settings_info.get('email_address'))}</div>
@@ -155,52 +319,112 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
         <div><strong>Groq model:</strong> {esc(settings_info.get('groq_model'))}</div>
         <div><strong>Last check:</strong> {esc(last_run_text)} ({esc(last_run_status)})</div>
       </div>
-      <div class="actions">{run_button}</div>
-    </div>
+    </section>
 
-    <div class="panel">
-      <h2>Google Sheets / Script Trigger URL</h2>
-      <p class="meta">Use this URL in your Google Apps Script time trigger:</p>
+    <section class="panel">
+      <h2>Google Apps Script Trigger URL</h2>
       <p><code>{esc(trigger_url)}</code></p>
-    </div>
+    </section>
 
-    <div class="panel">
+    <section class="panel">
       <h2>Recent Check Runs</h2>
-      <table>
-        <thead>
-          <tr><th>Started</th><th>Found</th><th>Processed</th><th>Alerts</th><th>Status</th></tr>
-        </thead>
-        <tbody>{run_rows}</tbody>
-      </table>
-    </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Started</th><th>Found</th><th>Processed</th><th>Alerts</th><th>Status</th></tr>
+          </thead>
+          <tbody>{run_rows}</tbody>
+        </table>
+      </div>
+    </section>
 
-    <div class="panel">
+    <section class="panel">
       <h2>Recent Emails</h2>
-      <table>
-        <thead>
-          <tr><th>Result</th><th>Subject</th><th>Sender</th><th>Category</th><th>Reason</th><th>Time</th></tr>
-        </thead>
-        <tbody>{email_rows}</tbody>
-      </table>
-    </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Result</th><th>Subject</th><th>Sender</th><th>Category</th><th>Reason</th><th>Time</th></tr>
+          </thead>
+          <tbody>{email_rows}</tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
   <script>
+    const statusEl = document.getElementById('runStatus');
+    const notifyBtn = document.getElementById('notifyBtn');
+
+    function setStatus(message) {{
+      statusEl.textContent = message || '';
+    }}
+
+    function urlBase64ToUint8Array(base64String) {{
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {{
+        outputArray[i] = rawData.charCodeAt(i);
+      }}
+      return outputArray;
+    }}
+
+    async function enableNotifications() {{
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {{
+        setStatus('Notifications are not supported on this browser.');
+        return;
+      }}
+
+      notifyBtn.disabled = true;
+      setStatus('Preparing notifications...');
+      try {{
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {{
+          setStatus('Notification permission was not allowed.');
+          return;
+        }}
+
+        const keyRes = await fetch('/api/push/public-key');
+        const keyData = await keyRes.json();
+        const subscription = await registration.pushManager.subscribe({{
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+        }});
+
+        const saveRes = await fetch('/api/push/subscribe', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(subscription)
+        }});
+        if (!saveRes.ok) throw new Error(await saveRes.text());
+        setStatus('Notifications enabled.');
+      }} catch (err) {{
+        setStatus('Notification setup failed: ' + err.message);
+      }} finally {{
+        notifyBtn.disabled = false;
+      }}
+    }}
+
     async function runCheck() {{
       const btn = document.getElementById('runBtn');
-      const status = document.getElementById('runStatus');
       btn.disabled = true;
-      status.textContent = 'Running inbox check...';
+      setStatus('Running inbox check...');
       try {{
-        const res = await fetch('/check');
+        const res = await fetch('/check?source=manual');
         const text = await res.text();
-        status.textContent = res.ok ? text : ('Error: ' + text);
+        setStatus(res.ok ? text : ('Error: ' + text));
         if (res.ok) setTimeout(() => location.reload(), 1200);
       }} catch (err) {{
-        status.textContent = 'Request failed: ' + err;
+        setStatus('Request failed: ' + err.message);
       }} finally {{
         btn.disabled = false;
       }}
+    }}
+
+    if ('Notification' in window && Notification.permission === 'granted') {{
+      setStatus('Notifications enabled.');
     }}
 
     setInterval(() => location.reload(), 60000);

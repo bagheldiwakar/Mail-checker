@@ -42,6 +42,7 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
     last_run_text = last_run.get("finished_at") or last_run.get("started_at") or "Never"
     last_run_status = last_run.get("status") or "waiting"
     trigger_url = settings_info.get("trigger_url", "")
+    push_subscriptions = int(settings_info.get("push_subscriptions", 0) or 0)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -318,6 +319,7 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
         <div><strong>Your name:</strong> {esc(settings_info.get('your_name') or 'Not set')}</div>
         <div><strong>Groq model:</strong> {esc(settings_info.get('groq_model'))}</div>
         <div><strong>Last check:</strong> {esc(last_run_text)} ({esc(last_run_status)})</div>
+        <div><strong>Phone notification tokens:</strong> {esc(push_subscriptions)}</div>
       </div>
     </section>
 

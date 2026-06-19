@@ -1,10 +1,12 @@
 services:
-  - type: cron
+  - type: web
     name: mail-checker
     runtime: python
-    schedule: "*/5 * * * *"
+    plan: free
+    region: oregon
     buildCommand: pip install -r requirements.txt
-    startCommand: python src/main.py --once
+    startCommand: python src/server.py
+    healthCheckPath: /health
     envVars:
       - key: EMAIL_ADDRESS
         sync: false
@@ -28,3 +30,5 @@ services:
         sync: false
       - key: ALERT_EMAIL
         sync: false
+      - key: CRON_SECRET
+        generateValue: true

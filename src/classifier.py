@@ -17,21 +17,22 @@ class ClassificationResult:
 
 SYSTEM_PROMPT = """You classify incoming emails for a job seeker.
 
-Mark as INTERESTING (alert the user) when the email shows genuine recruiter or hiring-manager interest, such as:
+Mark as INTERESTING (alert the user) when the email is important for the job search, such as:
 - A recruiter personally reaching out about a role or your profile
-- Invitation to interview, phone screen, or technical assessment
+- Invitation to interview, phone screen, HR round, technical round, test round, assignment, or assessment
+- Selected, shortlisted, moved to next round, or offer-related emails
 - Follow-up asking for availability, resume, or more details
 - A hiring manager expressing interest after reviewing the profile
 - Direct outreach from a company (not a mass job board blast)
+- Rejection emails or application result/status emails that say the user was not selected
 
 Mark as NOT INTERESTING (ignore) when the email is:
 - Generic "thank you for applying" or "we received your application"
-- Automated ATS status updates (under review, not selected, etc.)
+- Automated ATS status updates that only say the application is received, under review, or still being processed
 - Mass job alerts, newsletters, or LinkedIn "jobs you may like"
-- Rejection emails
 - Marketing, spam, or unrelated mail
 
-Be strict: only flag emails that deserve the user's immediate attention."""
+Be strict: only flag emails that deserve the user's attention because they contain an outcome, recruiter contact, interview, test, assessment, next step, offer, or rejection."""
 
 
 def _build_user_prompt(mail: IncomingMail, your_name: str) -> str:
@@ -47,7 +48,7 @@ Body:
 Respond with JSON only:
 {{
   "is_interesting": true or false,
-  "category": "recruiter_outreach | interview_invite | follow_up | auto_reply | rejection | newsletter | other",
+  "category": "recruiter_outreach | interview_invite | test_round | selected | follow_up | rejection | auto_reply | newsletter | other",
   "reason": "one short sentence",
   "urgency": "high | medium | low"
 }}"""

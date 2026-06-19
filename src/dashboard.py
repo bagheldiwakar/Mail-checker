@@ -1,8 +1,7 @@
 import html
-import json
 
 
-def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, recent_runs: list, secret: str = "") -> str:
+def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, recent_runs: list) -> str:
     def esc(value) -> str:
         return html.escape(str(value or ""))
 
@@ -44,9 +43,7 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
     last_run_status = last_run.get("status") or "waiting"
     trigger_url = settings_info.get("trigger_url", "")
 
-    run_button = ""
-    if secret:
-        run_button = """
+    run_button = """
         <button class="btn" id="runBtn" onclick="runCheck()">Run Check Now</button>
         <p id="runStatus" class="hint"></p>
         """
@@ -189,15 +186,13 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
   </div>
 
   <script>
-    const secret = {json.dumps(secret)};
-
     async function runCheck() {{
       const btn = document.getElementById('runBtn');
       const status = document.getElementById('runStatus');
       btn.disabled = true;
       status.textContent = 'Running inbox check...';
       try {{
-        const res = await fetch('/check?secret=' + encodeURIComponent(secret));
+        const res = await fetch('/check');
         const text = await res.text();
         status.textContent = res.ok ? text : ('Error: ' + text);
         if (res.ok) setTimeout(() => location.reload(), 1200);

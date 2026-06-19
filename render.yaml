@@ -30,5 +30,3 @@ services:
         sync: false
       - key: ALERT_EMAIL
         sync: false
-      - key: CRON_SECRET
-        generateValue: true

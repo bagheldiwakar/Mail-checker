@@ -5,7 +5,7 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -18,12 +18,7 @@ log = logging.getLogger("job-mail-agent")
 _check_lock = threading.Lock()
 
 
-def _authorized(secret: str) -> bool:
-    expected = os.getenv("CRON_SECRET", "")
-    return bool(expected) and secret == expected
-
-
-def _load_dashboard_context(secret: str = "") -> tuple[str, dict]:
+def _load_dashboard_context() -> tuple[str, dict]:
     settings = Settings.load()
     store = ProcessedMailStore(settings.data_dir / "processed.db")
     stats = store.get_stats()
@@ -34,13 +29,12 @@ def _load_dashboard_context(secret: str = "") -> tuple[str, dict]:
     if not host:
         host = "http://localhost:10000"
 
-    trigger_secret = secret or os.getenv("CRON_SECRET", "YOUR_CRON_SECRET")
     settings_info = {
         "email_address": settings.email_address,
         "alert_email": settings.alert_email,
         "your_name": settings.your_name,
         "groq_model": settings.groq_model,
-        "trigger_url": f"{host}/check?secret={trigger_secret}",
+        "trigger_url": f"{host}/check",
     }
 
     page = render_dashboard(
@@ -48,7 +42,6 @@ def _load_dashboard_context(secret: str = "") -> tuple[str, dict]:
         stats,
         recent_emails,
         recent_runs,
-        secret=secret,
     )
     return page, stats
 
@@ -84,12 +77,10 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        params = parse_qs(parsed.query)
-        secret = params.get("secret", [""])[0]
 
         if path in ("/", "/dashboard"):
             try:
-                page, _ = _load_dashboard_context(secret if _authorized(secret) else "")
+                page, _ = _load_dashboard_context()
                 self._send_text(200, page, "text/html; charset=utf-8")
             except Exception as exc:
                 log.exception("Dashboard failed")
@@ -115,10 +106,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/check":
-            if not _authorized(secret):
-                self._send_text(401, "Unauthorized. Add ?secret=YOUR_CRON_SECRET")
-                return
-
             code, message = self._run_check()
             self._send_text(code, message)
             return

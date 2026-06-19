@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import Settings
 from dashboard import render_dashboard
 from main import run_once
+from ntfy_alert import NtfyNotifier
 from push_service import PushSubscriptionStore, VapidKeys, WebPushNotifier
 from store import ProcessedMailStore
 
@@ -113,6 +114,13 @@ def _send_push_for_result(settings: Settings, manual: bool, message: str, alerts
         log.info("Sent %d web push notification(s).", sent)
     except Exception as exc:
         log.warning("Web push notification failed: %s", exc)
+
+    if manual and settings.ntfy_topic:
+        try:
+            NtfyNotifier(settings).notify_status("Manual mail check finished", message)
+            log.info("Sent ntfy manual status notification.")
+        except Exception as exc:
+            log.warning("ntfy manual status notification failed: %s", exc)
 
 
 class RequestHandler(BaseHTTPRequestHandler):

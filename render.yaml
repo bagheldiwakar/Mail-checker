@@ -29,7 +29,11 @@ services:
       - key: GROQ_REQUEST_DELAY_SECONDS
         value: "2"
       - key: NOTIFIER_MODE
-        value: email
+        value: auto
+      - key: NTFY_TOPIC
+        sync: false
+      - key: NTFY_SERVER
+        value: https://ntfy.sh
       - key: YOUR_NAME
         sync: false
       - key: ALERT_EMAIL

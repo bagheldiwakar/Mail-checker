@@ -2,6 +2,7 @@ from classifier import ClassificationResult
 from config import Settings
 from email_alert import EmailAlertNotifier
 from email_fetcher import IncomingMail
+from ntfy_alert import NtfyNotifier
 
 
 class DesktopNotifier:
@@ -42,6 +43,8 @@ class DesktopNotifier:
 
 def get_notifier(settings: Settings):
     mode = settings.resolved_notifier_mode()
+    if mode == "ntfy":
+        return NtfyNotifier(settings)
     if mode == "desktop":
         return DesktopNotifier()
     return EmailAlertNotifier(settings)

@@ -24,6 +24,8 @@ class Settings:
     groq_request_delay_seconds: float
     your_name: str
     notifier_mode: str
+    ntfy_topic: str
+    ntfy_server: str
     is_render: bool
     data_dir: Path
 
@@ -69,6 +71,8 @@ class Settings:
             groq_request_delay_seconds=float(os.getenv("GROQ_REQUEST_DELAY_SECONDS", "2")),
             your_name=os.getenv("YOUR_NAME", "").strip(),
             notifier_mode=notifier_mode,
+            ntfy_topic=os.getenv("NTFY_TOPIC", "").strip(),
+            ntfy_server=os.getenv("NTFY_SERVER", "https://ntfy.sh").strip(),
             is_render=is_render,
             data_dir=data_dir,
         )
@@ -76,6 +80,8 @@ class Settings:
     def resolved_notifier_mode(self) -> str:
         if self.notifier_mode != "auto":
             return self.notifier_mode
+        if self.ntfy_topic:
+            return "ntfy"
         if self.is_render:
             return "email"
         if os.name == "nt":

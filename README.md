@@ -115,7 +115,9 @@ python src/main.py --once
 | `ALERT_EMAIL` | same as `EMAIL_ADDRESS` | Where alert emails are sent |
 | `MAX_EMAILS_PER_CHECK` | `5` | How many unread emails to check per run |
 | `GROQ_REQUEST_DELAY_SECONDS` | `2` | Pause between AI calls to avoid rate limits |
-| `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, or `email` |
+| `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, `email`, or `ntfy` |
+| `NTFY_TOPIC` | - | Private ntfy topic for phone push alerts |
+| `NTFY_SERVER` | `https://ntfy.sh` | ntfy server URL |
 | `YOUR_NAME` | - | Helps AI detect personalized outreach |
 
 ## How it works
@@ -123,3 +125,19 @@ python src/main.py --once
 ```text
 Google Apps Script timer -> /check -> IMAP inbox -> Groq classify -> Email alert + Dashboard
 ```
+
+## Recommended phone alerts with ntfy
+
+Render may not always reach Gmail SMTP, so ntfy is the simplest phone alert path.
+
+1. Install the **ntfy** app on iPhone.
+2. Subscribe to a private topic name, for example `mail-checker-diwakar-928374`.
+3. In Render Environment, set:
+
+```text
+NOTIFIER_MODE=auto
+NTFY_TOPIC=mail-checker-diwakar-928374
+NTFY_SERVER=https://ntfy.sh
+```
+
+When AI finds important mail, ntfy sends the phone notification. Manual **Run Check Now** also sends a status notification.

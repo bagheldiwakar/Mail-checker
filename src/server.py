@@ -60,6 +60,15 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _send_text(self, code: int, body: str, content_type: str = "text/plain") -> None:
         self._send_bytes(code, body.encode(), content_type)
 
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        if parsed.path in ("/", "/dashboard", "/health"):
+            self.send_response(200)
+            self.end_headers()
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def _run_check(self) -> tuple[int, str]:
         if not _check_lock.acquire(blocking=False):
             return 429, "Check already running"

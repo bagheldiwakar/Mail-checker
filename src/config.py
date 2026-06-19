@@ -20,6 +20,8 @@ class Settings:
     groq_api_key: str
     groq_model: str
     poll_interval: int
+    max_emails_per_check: int
+    groq_request_delay_seconds: float
     your_name: str
     notifier_mode: str
     is_render: bool
@@ -63,6 +65,8 @@ class Settings:
             groq_api_key=api_key,
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip(),
             poll_interval=int(os.getenv("POLL_INTERVAL", "120")),
+            max_emails_per_check=int(os.getenv("MAX_EMAILS_PER_CHECK", "5")),
+            groq_request_delay_seconds=float(os.getenv("GROQ_REQUEST_DELAY_SECONDS", "2")),
             your_name=os.getenv("YOUR_NAME", "").strip(),
             notifier_mode=notifier_mode,
             is_render=is_render,

@@ -102,6 +102,8 @@ python src/main.py --once
 | `EMAIL_ADDRESS` | - | Required. Inbox to monitor |
 | `EMAIL_PASSWORD` | - | Required. App password |
 | `ALERT_EMAIL` | same as `EMAIL_ADDRESS` | Where alert emails are sent |
+| `MAX_EMAILS_PER_CHECK` | `5` | How many unread emails to check per run |
+| `GROQ_REQUEST_DELAY_SECONDS` | `2` | Pause between AI calls to avoid rate limits |
 | `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, or `email` |
 | `YOUR_NAME` | - | Helps AI detect personalized outreach |
 

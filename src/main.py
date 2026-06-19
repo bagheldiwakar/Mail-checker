@@ -45,7 +45,7 @@ def run_once(settings: Settings) -> RunResult:
     errors = 0
 
     try:
-        mails = fetcher.fetch_unseen()
+        mails = fetcher.fetch_unseen(settings.max_emails_per_check)
         emails_found = len(mails)
 
         if not mails:
@@ -55,7 +55,7 @@ def run_once(settings: Settings) -> RunResult:
 
         log.info("Found %d unread email(s). Classifying with Groq...", len(mails))
 
-        for mail in mails:
+        for index, mail in enumerate(mails):
             if store.is_processed(mail.message_id):
                 fetcher.mark_as_seen(mail.uid)
                 continue
@@ -92,6 +92,9 @@ def run_once(settings: Settings) -> RunResult:
             else:
                 skipped += 1
                 log.info("Skipped: %s (%s)", mail.subject, result.reason)
+
+            if settings.groq_request_delay_seconds > 0 and index < len(mails) - 1:
+                time.sleep(settings.groq_request_delay_seconds)
 
         message = (
             f"Processed {emails_processed} email(s), sent {alerts} alert(s), "

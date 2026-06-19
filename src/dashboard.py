@@ -351,9 +351,13 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
     </section>
   </div>
 
-  <script>
+    <script>
     const statusEl = document.getElementById('runStatus');
     const notifyBtn = document.getElementById('notifyBtn');
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
 
     function setStatus(message) {{
       statusEl.textContent = message || '';
@@ -370,16 +374,55 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
       return outputArray;
     }}
 
+    function notificationHelpMessage() {{
+      if (isIos && !isStandalone) {{
+        return 'On iPhone, open this site in Safari, tap Share, Add to Home Screen, then open from the new icon.';
+      }}
+      if (!('Notification' in window)) {{
+        return 'This browser cannot show website notifications.';
+      }}
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {{
+        return 'Push notifications are not available here. On iPhone, use the Home Screen app.';
+      }}
+      return '';
+    }}
+
+    async function getServiceWorkerRegistration() {{
+      const existing = await navigator.serviceWorker.getRegistration('/');
+      if (existing) return existing;
+      return navigator.serviceWorker.register('/service-worker.js');
+    }}
+
+    async function showLocalNotification(title, body) {{
+      if (!('Notification' in window) || Notification.permission !== 'granted') {{
+        return false;
+      }}
+      if (!('serviceWorker' in navigator)) {{
+        return false;
+      }}
+
+      const registration = await getServiceWorkerRegistration();
+      await navigator.serviceWorker.ready;
+      await registration.showNotification(title, {{
+        body,
+        icon: '/app-icon.svg',
+        badge: '/app-icon.svg',
+        data: {{ url: '/' }}
+      }});
+      return true;
+    }}
+
     async function enableNotifications() {{
-      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {{
-        setStatus('Notifications are not supported on this browser.');
+      const help = notificationHelpMessage();
+      if (help) {{
+        setStatus(help);
         return;
       }}
 
       notifyBtn.disabled = true;
       setStatus('Preparing notifications...');
       try {{
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        const registration = await getServiceWorkerRegistration();
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {{
           setStatus('Notification permission was not allowed.');
@@ -399,7 +442,8 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
           body: JSON.stringify(subscription)
         }});
         if (!saveRes.ok) throw new Error(await saveRes.text());
-        setStatus('Notifications enabled.');
+        await showLocalNotification('Mail Checker notifications enabled', 'This is your test notification.');
+        setStatus('Notifications enabled. A test notification was sent.');
       }} catch (err) {{
         setStatus('Notification setup failed: ' + err.message);
       }} finally {{
@@ -415,7 +459,18 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
         const res = await fetch('/check?source=manual');
         const text = await res.text();
         setStatus(res.ok ? text : ('Error: ' + text));
-        if (res.ok) setTimeout(() => location.reload(), 1200);
+        if (res.ok) {{
+          const shown = await showLocalNotification('Manual mail check finished', text || 'Notifications are working.');
+          if (!shown) {{
+            const help = notificationHelpMessage();
+            if (help) {{
+              setStatus(text + ' ' + help);
+            }} else {{
+              setStatus(text + ' Enable notifications to receive phone alerts.');
+            }}
+          }}
+          setTimeout(() => location.reload(), 1800);
+        }}
       }} catch (err) {{
         setStatus('Request failed: ' + err.message);
       }} finally {{
@@ -425,6 +480,9 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
 
     if ('Notification' in window && Notification.permission === 'granted') {{
       setStatus('Notifications enabled.');
+    }} else {{
+      const help = notificationHelpMessage();
+      if (help) setStatus(help);
     }}
 
     setInterval(() => location.reload(), 60000);

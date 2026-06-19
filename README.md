@@ -58,10 +58,10 @@ Set a time-driven trigger, like every 5 to 15 minutes, on `checkRecruiterMail`.
 
 ## iPhone notifications
 
-On iPhone, open the Render URL in Safari, share it, and choose **Add to Home Screen**. Open Mail Checker from the new Home Screen icon, then tap **Enable Notifications**.
+On iPhone, a normal browser tab will not ask for notification permission. Open the Render URL in Safari, share it, and choose **Add to Home Screen**. Open Mail Checker from the new Home Screen icon, then tap **Enable Notifications**.
 
 Notification behavior:
-- Manual **Run Check Now** sends a phone notification after every run.
+- Manual **Run Check Now** sends a test-style phone notification after every run when notifications are enabled.
 - Google Apps Script `/check` sends a phone notification only when important mail is found.
 - Email alerts still work through `ALERT_EMAIL`.
 

@@ -1,6 +1,7 @@
 # Mail Checker
 
 Monitors your inbox and alerts you when a recruiter shows real interest, not generic "thanks for applying" auto-replies.
+It only checks unread emails from today, so old unread emails are ignored.
 
 Uses Groq (`llama-3.3-70b-versatile`) for fast AI classification.
 

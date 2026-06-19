@@ -1,6 +1,7 @@
 import email
 import imaplib
 from dataclasses import dataclass
+from datetime import date
 from email.header import decode_header
 from email.utils import parseaddr
 
@@ -53,6 +54,10 @@ def _extract_body(msg: email.message.Message) -> str:
     return payload.decode(charset, errors="replace")
 
 
+def _imap_date(value: date) -> str:
+    return value.strftime("%d-%b-%Y")
+
+
 class EmailFetcher:
     def __init__(self, address: str, password: str, server: str, port: int):
         self.address = address
@@ -79,7 +84,7 @@ class EmailFetcher:
     def fetch_unseen(self, limit: int = 20) -> list[IncomingMail]:
         connection = self._connect()
 
-        status, data = connection.search(None, "UNSEEN")
+        status, data = connection.search(None, "UNSEEN", "SINCE", _imap_date(date.today()))
         if status != "OK" or not data or not data[0]:
             return []
 

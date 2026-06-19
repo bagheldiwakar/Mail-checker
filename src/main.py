@@ -53,7 +53,7 @@ def run_once(settings: Settings) -> RunResult:
             store.finish_check_run(run_id, 0, 0, 0)
             return RunResult(0, 0, 0, 0, 0, "No new unread emails.")
 
-        log.info("Found %d unread email(s). Classifying with Groq...", len(mails))
+        log.info("Found %d unread email(s) from today. Classifying with Groq...", len(mails))
 
         for index, mail in enumerate(mails):
             if store.is_processed(mail.message_id):

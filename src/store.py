@@ -52,6 +52,12 @@ class ProcessedMailStore:
             conn.execute("ALTER TABLE processed_emails ADD COLUMN category TEXT")
         if "reason" not in columns:
             conn.execute("ALTER TABLE processed_emails ADD COLUMN reason TEXT")
+        if "company_name" not in columns:
+            conn.execute("ALTER TABLE processed_emails ADD COLUMN company_name TEXT")
+        if "job_profile" not in columns:
+            conn.execute("ALTER TABLE processed_emails ADD COLUMN job_profile TEXT")
+        if "dismissed_at" not in columns:
+            conn.execute("ALTER TABLE processed_emails ADD COLUMN dismissed_at TEXT")
 
     def is_processed(self, message_id: str) -> bool:
         with self._connect() as conn:
@@ -69,13 +75,15 @@ class ProcessedMailStore:
         is_interesting: bool,
         category: str = "",
         reason: str = "",
+        company_name: str = "",
+        job_profile: str = "",
     ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO processed_emails
-                (message_id, subject, sender, is_interesting, category, reason)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (message_id, subject, sender, is_interesting, category, reason, company_name, job_profile)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -84,6 +92,8 @@ class ProcessedMailStore:
                     int(is_interesting),
                     category,
                     reason,
+                    company_name,
+                    job_profile,
                 ),
             )
 
@@ -157,7 +167,8 @@ class ProcessedMailStore:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT subject, sender, is_interesting, category, reason, processed_at
+                SELECT message_id, subject, sender, is_interesting, category, reason,
+                       company_name, job_profile, processed_at
                 FROM processed_emails
                 ORDER BY processed_at DESC
                 LIMIT ?
@@ -165,6 +176,35 @@ class ProcessedMailStore:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def get_active_alerts(self, limit: int = 20) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT message_id, subject, sender, category, reason,
+                       company_name, job_profile, processed_at
+                FROM processed_emails
+                WHERE is_interesting = 1
+                  AND dismissed_at IS NULL
+                ORDER BY processed_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def dismiss_alert(self, message_id: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE processed_emails
+                SET dismissed_at = CURRENT_TIMESTAMP
+                WHERE message_id = ?
+                  AND is_interesting = 1
+                """,
+                (message_id,),
+            )
+            return cursor.rowcount > 0
 
     def get_recent_runs(self, limit: int = 10) -> list[dict]:
         with self._connect() as conn:

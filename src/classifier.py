@@ -13,6 +13,8 @@ class ClassificationResult:
     category: str
     reason: str
     urgency: str
+    company_name: str = ""
+    job_profile: str = ""
 
 
 SYSTEM_PROMPT = """You classify incoming emails for a job seeker.
@@ -50,7 +52,9 @@ Respond with JSON only:
   "is_interesting": true or false,
   "category": "recruiter_outreach | interview_invite | test_round | selected | follow_up | rejection | auto_reply | newsletter | other",
   "reason": "one short sentence",
-  "urgency": "high | medium | low"
+  "urgency": "high | medium | low",
+  "company_name": "company name if clear, otherwise empty string",
+  "job_profile": "job title or role if clear, otherwise empty string"
 }}"""
 
 
@@ -90,4 +94,6 @@ class JobMailClassifier:
             category=str(data.get("category", "other")),
             reason=str(data.get("reason", "")),
             urgency=str(data.get("urgency", "low")),
+            company_name=str(data.get("company_name", "")),
+            job_profile=str(data.get("job_profile", "")),
         )

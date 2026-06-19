@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -9,3 +9,4 @@ class RunResult:
     skipped: int
     errors: int
     message: str
+    alert_summaries: list[dict] = field(default_factory=list)

@@ -72,6 +72,7 @@ def _load_dashboard_context() -> tuple[str, dict]:
     settings = Settings.load()
     store = ProcessedMailStore(settings.data_dir / "processed.db")
     stats = store.get_stats()
+    active_alerts = store.get_active_alerts()
     recent_emails = store.get_recent_emails()
     recent_runs = store.get_recent_runs()
 
@@ -91,24 +92,43 @@ def _load_dashboard_context() -> tuple[str, dict]:
     page = render_dashboard(
         settings_info,
         stats,
+        active_alerts,
         recent_emails,
         recent_runs,
     )
     return page, stats
 
 
-def _send_push_for_result(settings: Settings, manual: bool, message: str, alerts: int) -> None:
-    if not manual and alerts <= 0:
+def _alert_push_text(alerts: list[dict]) -> tuple[str, str]:
+    if not alerts:
+        return "Important job mail found", "Open Mail Checker to review the alert."
+
+    first = alerts[0]
+    company = first.get("company_name") or first.get("sender") or "Unknown company"
+    profile = first.get("job_profile") or first.get("subject") or "Job update"
+    sender = first.get("sender") or "Unknown sender"
+    title = f"Job alert: {profile}"[:80]
+    body = f"Company: {company}\nSender: {sender}"[:180]
+
+    if len(alerts) > 1:
+        body = f"{body}\n+{len(alerts) - 1} more important email(s)"
+    return title, body
+
+
+def _send_push_for_result(settings: Settings, manual: bool, result) -> None:
+    if not manual and result.alerts_sent <= 0:
         return
 
     try:
         notifier = WebPushNotifier(settings.data_dir, settings.alert_email)
-        if manual:
+        if result.alerts_sent:
+            title, body = _alert_push_text(result.alert_summaries)
+        elif manual:
             title = "Mail check finished"
-            body = message
+            body = result.message
         else:
-            title = "Important job mail found"
-            body = f"{alerts} important email(s) need your attention."
+            title = "Mail check finished"
+            body = result.message
 
         sent = notifier.send(title, body, "/")
         log.info("Sent %d web push notification(s).", sent)
@@ -155,7 +175,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             settings = Settings.load()
             result = run_once(settings)
-            _send_push_for_result(settings, manual, result.message, result.alerts_sent)
+            _send_push_for_result(settings, manual, result)
             return 200, result.message
         except Exception as exc:
             log.exception("Check failed")
@@ -198,6 +218,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 store = ProcessedMailStore(Settings.load().data_dir / "processed.db")
                 payload = {
                     "stats": stats,
+                    "active_alerts": store.get_active_alerts(20),
                     "recent_emails": store.get_recent_emails(10),
                     "recent_runs": store.get_recent_runs(5),
                 }
@@ -234,6 +255,20 @@ class RequestHandler(BaseHTTPRequestHandler):
                 subscription = self._read_json()
                 count = PushSubscriptionStore(settings.data_dir).add(subscription)
                 self._send_json(200, {"ok": True, "subscriptions": count})
+            except Exception as exc:
+                self._send_json(500, {"error": str(exc)})
+            return
+
+        if path == "/api/alerts/dismiss":
+            try:
+                settings = Settings.load()
+                payload = self._read_json()
+                message_id = str(payload.get("message_id", ""))
+                if not message_id:
+                    self._send_json(400, {"error": "message_id is required"})
+                    return
+                dismissed = ProcessedMailStore(settings.data_dir / "processed.db").dismiss_alert(message_id)
+                self._send_json(200, {"ok": True, "dismissed": dismissed})
             except Exception as exc:
                 self._send_json(500, {"error": str(exc)})
             return

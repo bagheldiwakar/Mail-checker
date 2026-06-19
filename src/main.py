@@ -43,6 +43,7 @@ def run_once(settings: Settings) -> RunResult:
     alerts = 0
     skipped = 0
     errors = 0
+    alert_summaries: list[dict] = []
 
     try:
         mails = fetcher.fetch_unseen(settings.max_emails_per_check)
@@ -75,6 +76,8 @@ def run_once(settings: Settings) -> RunResult:
                 result.is_interesting,
                 result.category,
                 result.reason,
+                result.company_name,
+                result.job_profile,
             )
 
             if settings.is_render or mode == "email":
@@ -82,8 +85,18 @@ def run_once(settings: Settings) -> RunResult:
 
             if result.is_interesting:
                 alerts += 1
+                alert_summaries.append(
+                    {
+                        "subject": mail.subject,
+                        "sender": mail.sender,
+                        "category": result.category,
+                        "reason": result.reason,
+                        "company_name": result.company_name,
+                        "job_profile": result.job_profile,
+                    }
+                )
                 log.info(
-                    "ALERT [%s] %s — %s",
+                    "ALERT [%s] %s - %s",
                     result.category,
                     mail.subject,
                     result.reason,
@@ -105,7 +118,7 @@ def run_once(settings: Settings) -> RunResult:
             f"skipped {skipped}."
         )
         store.finish_check_run(run_id, emails_found, emails_processed, alerts)
-        return RunResult(emails_found, emails_processed, alerts, skipped, errors, message)
+        return RunResult(emails_found, emails_processed, alerts, skipped, errors, message, alert_summaries)
     except Exception as exc:
         store.finish_check_run(run_id, emails_found, emails_processed, alerts, "error", str(exc))
         raise

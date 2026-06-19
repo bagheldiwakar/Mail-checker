@@ -1,7 +1,13 @@
 import html
 
 
-def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, recent_runs: list) -> str:
+def render_dashboard(
+    settings_info: dict,
+    stats: dict,
+    active_alerts: list,
+    recent_emails: list,
+    recent_runs: list,
+) -> str:
     def esc(value) -> str:
         return html.escape(str(value or ""))
 
@@ -37,6 +43,28 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
             </tr>"""
     else:
         run_rows = '<tr><td colspan="5" class="empty">No check runs yet.</td></tr>'
+
+    alert_cards = ""
+    if active_alerts:
+        for alert in active_alerts:
+            company = alert.get("company_name") or alert.get("sender") or "Unknown company"
+            profile = alert.get("job_profile") or alert.get("subject") or "Job update"
+            alert_cards += f"""
+            <article class="alert-card">
+              <div>
+                <div class="alert-topline">{esc(alert.get('category') or 'job_alert')}</div>
+                <h3>{esc(profile)}</h3>
+                <div class="alert-meta">
+                  <span><strong>Company:</strong> {esc(company)}</span>
+                  <span><strong>Sender:</strong> {esc(alert.get('sender'))}</span>
+                  <span><strong>Time:</strong> {esc(alert.get('processed_at'))}</span>
+                </div>
+                <p>{esc(alert.get('reason'))}</p>
+              </div>
+              <button class="btn secondary compact" data-message-id="{esc(alert.get('message_id'))}" onclick="dismissAlert(this)">Remove</button>
+            </article>"""
+    else:
+        alert_cards = '<p class="empty">No active important mail to track.</p>'
 
     last_run = stats.get("last_run") or {}
     last_run_text = last_run.get("finished_at") or last_run.get("started_at") or "Never"
@@ -194,6 +222,12 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
       background: #e8e8ed;
       color: var(--text);
     }}
+    .btn.compact {{
+      min-height: 36px;
+      padding: 0 14px;
+      font-size: 0.86rem;
+      flex: 0 0 auto;
+    }}
     .btn:disabled {{
       cursor: not-allowed;
       opacity: 0.58;
@@ -269,11 +303,51 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
     .badge.skip {{ background: rgba(110, 110, 115, 0.14); color: var(--muted); }}
     .badge.bad {{ background: rgba(215, 0, 21, 0.12); color: var(--red); }}
     .empty {{ color: var(--muted); text-align: center; }}
+    .alerts-list {{
+      display: grid;
+      gap: 12px;
+    }}
+    .alert-card {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+    }}
+    .alert-card h3 {{
+      margin: 4px 0 8px;
+      font-size: 1.12rem;
+      line-height: 1.25;
+    }}
+    .alert-card p {{
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }}
+    .alert-topline {{
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }}
+    .alert-meta {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      overflow-wrap: anywhere;
+    }}
     @media (max-width: 760px) {{
       .topbar, .hero {{ display: block; }}
       .status-pill {{ margin-top: 16px; }}
       .primary {{ min-height: 276px; margin-bottom: 14px; }}
       .grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .alert-card {{ display: block; }}
+      .alert-card .btn {{ margin-top: 14px; }}
       .card {{ min-height: 104px; padding: 14px; }}
       .wrap {{ padding-left: 14px; padding-right: 14px; }}
     }}
@@ -308,6 +382,13 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
         <div class="card"><h3>Alerts Sent</h3><div class="num">{esc(stats.get('total_alerts', 0))}</div></div>
         <div class="card"><h3>Processed</h3><div class="num">{esc(stats.get('total_emails', 0))}</div></div>
         <div class="card"><h3>Skipped</h3><div class="num">{esc(stats.get('total_skipped', 0))}</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Important Mail To Track</h2>
+      <div class="alerts-list">
+        {alert_cards}
       </div>
     </section>
 
@@ -477,6 +558,25 @@ def render_dashboard(settings_info: dict, stats: dict, recent_emails: list, rece
         setStatus('Request failed: ' + err.message);
       }} finally {{
         btn.disabled = false;
+      }}
+    }}
+
+    async function dismissAlert(button) {{
+      const messageId = button.getAttribute('data-message-id');
+      if (!messageId) return;
+      button.disabled = true;
+      try {{
+        const res = await fetch('/api/alerts/dismiss', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ message_id: messageId }})
+        }});
+        if (!res.ok) throw new Error(await res.text());
+        setStatus('Removed from dashboard tracking.');
+        setTimeout(() => location.reload(), 500);
+      }} catch (err) {{
+        button.disabled = false;
+        setStatus('Remove failed: ' + err.message);
       }}
     }}
 

@@ -10,6 +10,7 @@ from classifier import JobMailClassifier
 from config import Settings
 from email_fetcher import EmailFetcher
 from notifier import get_notifier
+from results import RunResult
 from store import ProcessedMailStore
 
 logging.basicConfig(
@@ -20,8 +21,9 @@ logging.basicConfig(
 log = logging.getLogger("job-mail-agent")
 
 
-def run_once(settings: Settings) -> int:
+def run_once(settings: Settings) -> RunResult:
     store = ProcessedMailStore(settings.data_dir / "processed.db")
+    run_id = store.start_check_run()
     fetcher = EmailFetcher(
         settings.email_address,
         settings.email_password,
@@ -36,14 +38,22 @@ def run_once(settings: Settings) -> int:
     notifier = get_notifier(settings)
     mode = settings.resolved_notifier_mode()
 
+    emails_found = 0
+    emails_processed = 0
+    alerts = 0
+    skipped = 0
+    errors = 0
+
     try:
         mails = fetcher.fetch_unseen()
+        emails_found = len(mails)
+
         if not mails:
             log.info("No new unread emails.")
-            return 0
+            store.finish_check_run(run_id, 0, 0, 0)
+            return RunResult(0, 0, 0, 0, 0, "No new unread emails.")
 
         log.info("Found %d unread email(s). Classifying with Groq...", len(mails))
-        alerts = 0
 
         for mail in mails:
             if store.is_processed(mail.message_id):
@@ -53,14 +63,18 @@ def run_once(settings: Settings) -> int:
             try:
                 result = classifier.classify(mail)
             except Exception as exc:
+                errors += 1
                 log.error("Failed to classify '%s': %s", mail.subject, exc)
                 continue
 
+            emails_processed += 1
             store.mark_processed(
                 mail.message_id,
                 mail.subject,
                 mail.sender,
                 result.is_interesting,
+                result.category,
+                result.reason,
             )
 
             if settings.is_render or mode == "email":
@@ -76,9 +90,18 @@ def run_once(settings: Settings) -> int:
                 )
                 notifier.notify(mail, result)
             else:
+                skipped += 1
                 log.info("Skipped: %s (%s)", mail.subject, result.reason)
 
-        return alerts
+        message = (
+            f"Processed {emails_processed} email(s), sent {alerts} alert(s), "
+            f"skipped {skipped}."
+        )
+        store.finish_check_run(run_id, emails_found, emails_processed, alerts)
+        return RunResult(emails_found, emails_processed, alerts, skipped, errors, message)
+    except Exception as exc:
+        store.finish_check_run(run_id, emails_found, emails_processed, alerts, "error", str(exc))
+        raise
     finally:
         fetcher.close()
 
@@ -88,7 +111,7 @@ def main() -> None:
     parser.add_argument(
         "--once",
         action="store_true",
-        help="Run a single inbox check and exit (used by Render cron)",
+        help="Run a single inbox check and exit",
     )
     args = parser.parse_args()
 
@@ -105,8 +128,8 @@ def main() -> None:
 
     if args.once:
         try:
-            alerts = run_once(settings)
-            log.info("Done. Sent %d alert(s).", alerts)
+            result = run_once(settings)
+            log.info("Done. %s", result.message)
         except Exception as exc:
             log.error("Error during check: %s", exc)
             sys.exit(1)
@@ -116,9 +139,9 @@ def main() -> None:
 
     while True:
         try:
-            alerts = run_once(settings)
-            if alerts:
-                log.info("Sent %d alert(s) this cycle.", alerts)
+            result = run_once(settings)
+            if result.alerts_sent:
+                log.info("Sent %d alert(s) this cycle.", result.alerts_sent)
         except KeyboardInterrupt:
             log.info("Stopping agent.")
             break

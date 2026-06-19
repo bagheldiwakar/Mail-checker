@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -9,54 +10,120 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import Settings
+from dashboard import render_dashboard
 from main import run_once
+from store import ProcessedMailStore
 
 log = logging.getLogger("job-mail-agent")
 _check_lock = threading.Lock()
+
+
+def _authorized(secret: str) -> bool:
+    expected = os.getenv("CRON_SECRET", "")
+    return bool(expected) and secret == expected
+
+
+def _load_dashboard_context(secret: str = "") -> tuple[str, dict]:
+    settings = Settings.load()
+    store = ProcessedMailStore(settings.data_dir / "processed.db")
+    stats = store.get_stats()
+    recent_emails = store.get_recent_emails()
+    recent_runs = store.get_recent_runs()
+
+    host = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if not host:
+        host = "http://localhost:10000"
+
+    trigger_secret = secret or os.getenv("CRON_SECRET", "YOUR_CRON_SECRET")
+    settings_info = {
+        "email_address": settings.email_address,
+        "alert_email": settings.alert_email,
+        "your_name": settings.your_name,
+        "groq_model": settings.groq_model,
+        "trigger_url": f"{host}/check?secret={trigger_secret}",
+    }
+
+    page = render_dashboard(
+        settings_info,
+        stats,
+        recent_emails,
+        recent_runs,
+        secret=secret,
+    )
+    return page, stats
 
 
 class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         log.info("%s - %s", self.address_string(), format % args)
 
-    def _send(self, code: int, body: str) -> None:
+    def _send_bytes(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)
-        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body.encode())
+        self.wfile.write(body)
+
+    def _send_text(self, code: int, body: str, content_type: str = "text/plain") -> None:
+        self._send_bytes(code, body.encode(), content_type)
+
+    def _run_check(self) -> tuple[int, str]:
+        if not _check_lock.acquire(blocking=False):
+            return 429, "Check already running"
+
+        try:
+            settings = Settings.load()
+            result = run_once(settings)
+            return 200, result.message
+        except Exception as exc:
+            log.exception("Check failed")
+            return 500, f"Error: {exc}"
+        finally:
+            _check_lock.release()
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        params = parse_qs(parsed.query)
+        secret = params.get("secret", [""])[0]
+
+        if path in ("/", "/dashboard"):
+            try:
+                page, _ = _load_dashboard_context(secret if _authorized(secret) else "")
+                self._send_text(200, page, "text/html; charset=utf-8")
+            except Exception as exc:
+                log.exception("Dashboard failed")
+                self._send_text(500, f"Dashboard error: {exc}")
+            return
 
         if path == "/health":
-            self._send(200, "OK")
+            self._send_text(200, "OK")
+            return
+
+        if path == "/api/stats":
+            try:
+                _, stats = _load_dashboard_context()
+                store = ProcessedMailStore(Settings.load().data_dir / "processed.db")
+                payload = {
+                    "stats": stats,
+                    "recent_emails": store.get_recent_emails(10),
+                    "recent_runs": store.get_recent_runs(5),
+                }
+                self._send_text(200, json.dumps(payload), "application/json")
+            except Exception as exc:
+                self._send_text(500, json.dumps({"error": str(exc)}), "application/json")
             return
 
         if path == "/check":
-            params = parse_qs(urlparse(self.path).query)
-            secret = params.get("secret", [""])[0]
-            expected = os.getenv("CRON_SECRET", "")
-
-            if not expected or secret != expected:
-                self._send(401, "Unauthorized")
+            if not _authorized(secret):
+                self._send_text(401, "Unauthorized. Add ?secret=YOUR_CRON_SECRET")
                 return
 
-            if not _check_lock.acquire(blocking=False):
-                self._send(429, "Check already running")
-                return
-
-            try:
-                settings = Settings.load()
-                alerts = run_once(settings)
-                self._send(200, f"OK alerts={alerts}")
-            except Exception as exc:
-                log.exception("Check failed")
-                self._send(500, f"Error: {exc}")
-            finally:
-                _check_lock.release()
+            code, message = self._run_check()
+            self._send_text(code, message)
             return
 
-        self._send(404, "Not found")
+        self._send_text(404, "Not found")
 
 
 def main() -> None:
@@ -66,7 +133,7 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
     port = int(os.getenv("PORT", "10000"))
-    log.info("Mail Checker web server listening on port %d", port)
+    log.info("Mail Checker dashboard running on port %d", port)
     HTTPServer(("0.0.0.0", port), RequestHandler).serve_forever()
 
 

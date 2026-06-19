@@ -1,0 +1,30 @@
+services:
+  - type: cron
+    name: mail-checker
+    runtime: python
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/main.py --once
+    envVars:
+      - key: EMAIL_ADDRESS
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: IMAP_SERVER
+        value: imap.gmail.com
+      - key: IMAP_PORT
+        value: "993"
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: NOTIFIER_MODE
+        value: email
+      - key: YOUR_NAME
+        sync: false
+      - key: ALERT_EMAIL
+        sync: false

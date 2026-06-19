@@ -88,7 +88,11 @@ def run_once(settings: Settings) -> RunResult:
                     mail.subject,
                     result.reason,
                 )
-                notifier.notify(mail, result)
+                try:
+                    notifier.notify(mail, result)
+                except Exception as exc:
+                    errors += 1
+                    log.error("Failed to send alert for '%s': %s", mail.subject, exc)
             else:
                 skipped += 1
                 log.info("Skipped: %s (%s)", mail.subject, result.reason)

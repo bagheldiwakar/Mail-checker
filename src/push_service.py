@@ -115,6 +115,8 @@ class WebPushNotifier:
                     data=payload,
                     vapid_private_key=self.private_key,
                     vapid_claims=self.claims,
+                    timeout=10,
+                    ttl=3600,
                 )
                 sent += 1
                 active_subscriptions.append(subscription)

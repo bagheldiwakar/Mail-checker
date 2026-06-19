@@ -41,7 +41,7 @@ This alert was sent by Mail Checker running on Render.
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
 
-        with smtplib.SMTP(self.settings.smtp_server, self.settings.smtp_port) as server:
+        with smtplib.SMTP(self.settings.smtp_server, self.settings.smtp_port, timeout=15) as server:
             server.starttls()
             server.login(self.settings.email_address, self.settings.email_password)
             server.send_message(msg)

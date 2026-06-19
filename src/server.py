@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -100,16 +100,19 @@ def _send_push_for_result(settings: Settings, manual: bool, message: str, alerts
     if not manual and alerts <= 0:
         return
 
-    notifier = WebPushNotifier(settings.data_dir, settings.alert_email)
-    if manual:
-        title = "Mail check finished"
-        body = message
-    else:
-        title = "Important job mail found"
-        body = f"{alerts} important email(s) need your attention."
+    try:
+        notifier = WebPushNotifier(settings.data_dir, settings.alert_email)
+        if manual:
+            title = "Mail check finished"
+            body = message
+        else:
+            title = "Important job mail found"
+            body = f"{alerts} important email(s) need your attention."
 
-    sent = notifier.send(title, body, "/")
-    log.info("Sent %d web push notification(s).", sent)
+        sent = notifier.send(title, body, "/")
+        log.info("Sent %d web push notification(s).", sent)
+    except Exception as exc:
+        log.warning("Web push notification failed: %s", exc)
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -246,7 +249,7 @@ def main() -> None:
     )
     port = int(os.getenv("PORT", "10000"))
     log.info("Mail Checker dashboard running on port %d", port)
-    HTTPServer(("0.0.0.0", port), RequestHandler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", port), RequestHandler).serve_forever()
 
 
 if __name__ == "__main__":

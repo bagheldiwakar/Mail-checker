@@ -54,9 +54,23 @@ def run_once(settings: Settings) -> RunResult:
             store.finish_check_run(run_id, 0, 0, 0)
             return RunResult(0, 0, 0, 0, 0, "No new unread emails.")
 
-        log.info("Found %d unread email(s) from today. Classifying with Groq...", len(mails))
+        log.info("Found %d unread email(s) from today. Applying privacy guard...", len(mails))
 
         for index, mail in enumerate(mails):
+            if mail.privacy_skip:
+                if not store.is_processed(mail.message_id):
+                    store.mark_processed(
+                        mail.message_id,
+                        "[Sensitive email skipped]",
+                        mail.sender,
+                        False,
+                        "privacy_skip",
+                        mail.privacy_reason,
+                    )
+                skipped += 1
+                log.info("Privacy skipped sensitive email from %s before reading body.", mail.sender)
+                continue
+
             if store.is_processed(mail.message_id):
                 fetcher.mark_as_seen(mail.uid)
                 continue

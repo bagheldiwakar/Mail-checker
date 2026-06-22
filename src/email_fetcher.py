@@ -3,6 +3,7 @@ import imaplib
 from dataclasses import dataclass
 from datetime import date
 from email.header import decode_header
+from email.message import Message
 from email.utils import parseaddr
 
 
@@ -14,6 +15,40 @@ class IncomingMail:
     sender_email: str
     body: str
     uid: str
+    privacy_skip: bool = False
+    privacy_reason: str = ""
+
+
+SENSITIVE_SUBJECT_KEYWORDS = (
+    "otp",
+    "one-time password",
+    "one time password",
+    "verification code",
+    "confirmation code",
+    "verify your",
+    "verify email",
+    "email verification",
+    "confirm your email",
+    "security code",
+    "authentication code",
+    "login code",
+    "sign-in code",
+    "signin code",
+    "passcode",
+    "password reset",
+    "reset your password",
+    "reset password",
+    "forgot password",
+    "account recovery",
+    "recover your account",
+    "new login",
+    "login alert",
+    "security alert",
+    "suspicious login",
+    "two-factor",
+    "2fa",
+    "mfa",
+)
 
 
 def _decode_header_value(value: str | None) -> str:
@@ -29,7 +64,7 @@ def _decode_header_value(value: str | None) -> str:
     return " ".join(decoded).strip()
 
 
-def _extract_body(msg: email.message.Message) -> str:
+def _extract_body(msg: Message) -> str:
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
@@ -56,6 +91,21 @@ def _extract_body(msg: email.message.Message) -> str:
 
 def _imap_date(value: date) -> str:
     return value.strftime("%d-%b-%Y")
+
+
+def _is_sensitive_subject(subject: str) -> bool:
+    normalized = " ".join(subject.lower().replace("_", " ").replace("-", " ").split())
+    return any(keyword in normalized for keyword in SENSITIVE_SUBJECT_KEYWORDS)
+
+
+def _parse_message_headers(raw: bytes, fallback_uid: bytes) -> tuple[str, str, str, str]:
+    msg = email.message_from_bytes(raw)
+    message_id = msg.get("Message-ID", f"uid-{fallback_uid.decode()}").strip()
+    subject = _decode_header_value(msg.get("Subject"))
+    sender_raw = _decode_header_value(msg.get("From"))
+    sender_name, sender_email = parseaddr(sender_raw)
+    sender = sender_name or sender_email or sender_raw
+    return message_id, subject, sender, sender_email
 
 
 class EmailFetcher:
@@ -93,6 +143,33 @@ class EmailFetcher:
 
         mails: list[IncomingMail] = []
         for uid in uids:
+            status, header_data = connection.fetch(
+                uid,
+                "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM)])",
+            )
+            if status != "OK" or not header_data or not header_data[0]:
+                continue
+
+            message_id, subject, sender, sender_email = _parse_message_headers(
+                header_data[0][1],
+                uid,
+            )
+
+            if _is_sensitive_subject(subject):
+                mails.append(
+                    IncomingMail(
+                        message_id=message_id,
+                        subject=subject,
+                        sender=sender,
+                        sender_email=sender_email,
+                        body="",
+                        uid=uid.decode(),
+                        privacy_skip=True,
+                        privacy_reason="Sensitive subject matched before reading body",
+                    )
+                )
+                continue
+
             status, msg_data = connection.fetch(uid, "(RFC822)")
             if status != "OK" or not msg_data or not msg_data[0]:
                 continue
@@ -100,11 +177,6 @@ class EmailFetcher:
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
 
-            message_id = msg.get("Message-ID", f"uid-{uid.decode()}").strip()
-            subject = _decode_header_value(msg.get("Subject"))
-            sender_raw = _decode_header_value(msg.get("From"))
-            sender_name, sender_email = parseaddr(sender_raw)
-            sender = sender_name or sender_email or sender_raw
             body = _extract_body(msg).strip()
 
             mails.append(

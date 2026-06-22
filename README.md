@@ -2,6 +2,7 @@
 
 Monitors your inbox and alerts you when a recruiter shows real interest, sends an interview or test round, selects or rejects you, or shares another important job update.
 It only checks unread emails from today, so old unread emails are ignored.
+It skips OTP, password reset, login, and security emails from the subject line before reading the body or sending anything to AI.
 
 Uses Groq (`llama-3.3-70b-versatile`) for fast AI classification.
 

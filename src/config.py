@@ -24,6 +24,7 @@ class Settings:
     groq_request_delay_seconds: float
     your_name: str
     notifier_mode: str
+    gmail_ios_account_id: int
     is_render: bool
     data_dir: Path
 
@@ -53,6 +54,7 @@ class Settings:
 
         alert_email = os.getenv("ALERT_EMAIL", "").strip() or email
         notifier_mode = os.getenv("NOTIFIER_MODE", "auto").strip().lower()
+        gmail_ios_account_id = int(os.getenv("GMAIL_IOS_ACCOUNT_ID", "1").strip() or "1")
 
         return cls(
             email_address=email,
@@ -69,6 +71,7 @@ class Settings:
             groq_request_delay_seconds=float(os.getenv("GROQ_REQUEST_DELAY_SECONDS", "2")),
             your_name=os.getenv("YOUR_NAME", "").strip(),
             notifier_mode=notifier_mode,
+            gmail_ios_account_id=max(1, gmail_ios_account_id),
             is_render=is_render,
             data_dir=data_dir,
         )

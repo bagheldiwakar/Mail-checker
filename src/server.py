@@ -85,6 +85,7 @@ def _load_dashboard_context() -> tuple[str, dict]:
         "alert_email": settings.alert_email,
         "your_name": settings.your_name,
         "groq_model": settings.groq_model,
+        "gmail_ios_account_id": settings.gmail_ios_account_id,
         "trigger_url": f"{host}/check",
         "push_subscriptions": len(PushSubscriptionStore(settings.data_dir).all()),
     }

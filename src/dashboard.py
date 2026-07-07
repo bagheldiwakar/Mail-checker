@@ -19,12 +19,13 @@ def _gmail_message_url(gmail_thread_id, message_id) -> str:
     )
 
 
-def _gmail_app_message_url(gmail_thread_id) -> str:
+def _gmail_app_message_url(gmail_thread_id, account_id: int = 1) -> str:
     gmail_thread_id = str(gmail_thread_id or "").strip()
     if not gmail_thread_id:
         return ""
     thread_id = quote(gmail_thread_id, safe="")
-    return f"googlegmail:///cv={thread_id}/accountId=1&create-new-tab"
+    account_id = max(1, int(account_id or 1))
+    return f"googlegmail:///cv={thread_id}/accountId={account_id}&create-new-tab"
 
 
 def render_dashboard(
@@ -70,6 +71,7 @@ def render_dashboard(
     else:
         run_rows = '<tr><td colspan="5" class="empty">No check runs yet.</td></tr>'
 
+    gmail_ios_account_id = int(settings_info.get("gmail_ios_account_id", 1) or 1)
     alert_cards = ""
     if active_alerts:
         for alert in active_alerts:
@@ -79,7 +81,10 @@ def render_dashboard(
                 alert.get("gmail_thread_id"),
                 alert.get("message_id"),
             )
-            gmail_app_url = _gmail_app_message_url(alert.get("gmail_thread_id"))
+            gmail_app_url = _gmail_app_message_url(
+                alert.get("gmail_thread_id"),
+                gmail_ios_account_id,
+            )
             card_class = "alert-card clickable" if gmail_url else "alert-card"
             open_attrs = (
                 f'role="link" tabindex="0" data-gmail-url="{esc(gmail_url)}" '
@@ -451,6 +456,7 @@ def render_dashboard(
         <div><strong>Alert email:</strong> {esc(settings_info.get('alert_email'))}</div>
         <div><strong>Your name:</strong> {esc(settings_info.get('your_name') or 'Not set')}</div>
         <div><strong>Groq model:</strong> {esc(settings_info.get('groq_model'))}</div>
+        <div><strong>Gmail iPhone account ID:</strong> {esc(gmail_ios_account_id)}</div>
         <div><strong>Last check:</strong> {esc(last_run_text)} ({esc(last_run_status)})</div>
         <div><strong>Phone notification tokens:</strong> {esc(push_subscriptions)}</div>
       </div>

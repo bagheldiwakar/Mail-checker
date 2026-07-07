@@ -68,6 +68,11 @@ Notification behavior:
 - Google Apps Script `/check` sends a phone notification only when important mail is found.
 - Email alerts still work through `ALERT_EMAIL`.
 
+Gmail app opening:
+- `GMAIL_IOS_ACCOUNT_ID` controls which Gmail account slot the iPhone Gmail app opens.
+- Start with `1`. If Gmail opens but not the same mail, try `2`, then `3`.
+- The dashboard shows the current Gmail iPhone account ID under **Agent Config**.
+
 ## How to verify it is working
 
 1. Open the dashboard. You should see "Agent online" and config details.
@@ -120,6 +125,7 @@ python src/main.py --once
 | `GROQ_REQUEST_DELAY_SECONDS` | `2` | Pause between AI calls to avoid rate limits |
 | `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, or `email` |
 | `YOUR_NAME` | - | Helps AI detect personalized outreach |
+| `GMAIL_IOS_ACCOUNT_ID` | `1` | Gmail iPhone app account slot for opening exact alert mails |
 
 ## How it works
 

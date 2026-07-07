@@ -23,10 +23,8 @@ def _gmail_app_message_url(gmail_thread_id) -> str:
     gmail_thread_id = str(gmail_thread_id or "").strip()
     if not gmail_thread_id:
         return ""
-    return "googlegmail:///cv=" + quote(
-        gmail_thread_id,
-        safe="",
-    )
+    thread_id = quote(gmail_thread_id, safe="")
+    return f"googlegmail:///cv={thread_id}/accountId=1&create-new-tab"
 
 
 def render_dashboard(

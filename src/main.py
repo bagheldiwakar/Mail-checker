@@ -66,6 +66,7 @@ def run_once(settings: Settings) -> RunResult:
                         False,
                         "privacy_skip",
                         mail.privacy_reason,
+                        gmail_thread_id=mail.gmail_thread_id,
                     )
                 skipped += 1
                 log.info("Privacy skipped sensitive email from %s before reading body.", mail.sender)
@@ -92,6 +93,7 @@ def run_once(settings: Settings) -> RunResult:
                 result.reason,
                 result.company_name,
                 result.job_profile,
+                mail.gmail_thread_id,
             )
 
             if settings.is_render or mode == "email":
@@ -107,6 +109,7 @@ def run_once(settings: Settings) -> RunResult:
                         "reason": result.reason,
                         "company_name": result.company_name,
                         "job_profile": result.job_profile,
+                        "gmail_thread_id": mail.gmail_thread_id,
                     }
                 )
                 log.info(

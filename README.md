@@ -17,6 +17,7 @@ https://mail-checker-1ips.onrender.com
 The dashboard shows:
 - Total checks, alerts sent, emails processed
 - Recent check runs and classified emails
+- Clickable important alert cards that open the matching Gmail thread
 - Your Google Sheets trigger URL
 - Run Check Now button
 - iPhone home-screen push notifications

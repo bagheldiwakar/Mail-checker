@@ -1,4 +1,22 @@
 import html
+from urllib.parse import quote
+
+
+def _gmail_message_url(gmail_thread_id, message_id) -> str:
+    gmail_thread_id = str(gmail_thread_id or "").strip()
+    if gmail_thread_id:
+        return "https://mail.google.com/mail/u/0/#all/" + quote(
+            gmail_thread_id,
+            safe="",
+        )
+
+    message_id = str(message_id or "").strip()
+    if not message_id or message_id.startswith("uid-"):
+        return ""
+    return "https://mail.google.com/mail/u/0/#search/" + quote(
+        f"rfc822msgid:{message_id}",
+        safe="",
+    )
 
 
 def render_dashboard(
@@ -49,8 +67,21 @@ def render_dashboard(
         for alert in active_alerts:
             company = alert.get("company_name") or alert.get("sender") or "Unknown company"
             profile = alert.get("job_profile") or alert.get("subject") or "Job update"
+            gmail_url = _gmail_message_url(
+                alert.get("gmail_thread_id"),
+                alert.get("message_id"),
+            )
+            card_class = "alert-card clickable" if gmail_url else "alert-card"
+            open_attrs = (
+                f'role="link" tabindex="0" data-gmail-url="{esc(gmail_url)}" '
+                f'aria-label="Open {esc(profile)} in Gmail" '
+                'onclick="openMailFromCard(this)" '
+                'onkeydown="openMailFromCardKey(event, this)"'
+                if gmail_url
+                else ""
+            )
             alert_cards += f"""
-            <article class="alert-card">
+            <article class="{card_class}" {open_attrs}>
               <div>
                 <div class="alert-topline">{esc(alert.get('category') or 'job_alert')}</div>
                 <h3>{esc(profile)}</h3>
@@ -61,7 +92,7 @@ def render_dashboard(
                 </div>
                 <p>{esc(alert.get('reason'))}</p>
               </div>
-              <button class="btn secondary compact" data-message-id="{esc(alert.get('message_id'))}" onclick="dismissAlert(this)">Remove</button>
+              <button class="btn secondary compact" data-message-id="{esc(alert.get('message_id'))}" onclick="dismissAlert(event, this)">Remove</button>
             </article>"""
     else:
         alert_cards = '<p class="empty">No active important mail to track.</p>'
@@ -317,6 +348,17 @@ def render_dashboard(
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.72);
     }}
+    .alert-card.clickable {{
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+    }}
+    .alert-card.clickable:hover,
+    .alert-card.clickable:focus-visible {{
+      background: #ffffff;
+      border-color: rgba(0, 113, 227, 0.34);
+      transform: translateY(-1px);
+      outline: none;
+    }}
     .alert-card h3 {{
       margin: 4px 0 8px;
       font-size: 1.12rem;
@@ -561,7 +603,23 @@ def render_dashboard(
       }}
     }}
 
-    async function dismissAlert(button) {{
+    function openMailFromCard(card) {{
+      const gmailUrl = card.getAttribute('data-gmail-url');
+      if (!gmailUrl) return;
+      const opened = window.open(gmailUrl, '_blank', 'noopener');
+      if (!opened) {{
+        window.location.href = gmailUrl;
+      }}
+    }}
+
+    function openMailFromCardKey(event, card) {{
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openMailFromCard(card);
+    }}
+
+    async function dismissAlert(event, button) {{
+      event.stopPropagation();
       const messageId = button.getAttribute('data-message-id');
       if (!messageId) return;
       button.disabled = true;

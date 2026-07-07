@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -7,10 +9,18 @@ class ProcessedMailStore:
         self.db_path = db_path
         self._init_db()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         with self._connect() as conn:
@@ -56,6 +66,8 @@ class ProcessedMailStore:
             conn.execute("ALTER TABLE processed_emails ADD COLUMN company_name TEXT")
         if "job_profile" not in columns:
             conn.execute("ALTER TABLE processed_emails ADD COLUMN job_profile TEXT")
+        if "gmail_thread_id" not in columns:
+            conn.execute("ALTER TABLE processed_emails ADD COLUMN gmail_thread_id TEXT")
         if "dismissed_at" not in columns:
             conn.execute("ALTER TABLE processed_emails ADD COLUMN dismissed_at TEXT")
 
@@ -77,13 +89,14 @@ class ProcessedMailStore:
         reason: str = "",
         company_name: str = "",
         job_profile: str = "",
+        gmail_thread_id: str = "",
     ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO processed_emails
-                (message_id, subject, sender, is_interesting, category, reason, company_name, job_profile)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (message_id, subject, sender, is_interesting, category, reason, company_name, job_profile, gmail_thread_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -94,6 +107,7 @@ class ProcessedMailStore:
                     reason,
                     company_name,
                     job_profile,
+                    gmail_thread_id,
                 ),
             )
 
@@ -168,7 +182,7 @@ class ProcessedMailStore:
             rows = conn.execute(
                 """
                 SELECT message_id, subject, sender, is_interesting, category, reason,
-                       company_name, job_profile, processed_at
+                       company_name, job_profile, gmail_thread_id, processed_at
                 FROM processed_emails
                 ORDER BY processed_at DESC
                 LIMIT ?
@@ -182,7 +196,7 @@ class ProcessedMailStore:
             rows = conn.execute(
                 """
                 SELECT message_id, subject, sender, category, reason,
-                       company_name, job_profile, processed_at
+                       company_name, job_profile, gmail_thread_id, processed_at
                 FROM processed_emails
                 WHERE is_interesting = 1
                   AND dismissed_at IS NULL

@@ -1,5 +1,6 @@
 import email
 import imaplib
+import re
 from dataclasses import dataclass
 from datetime import date
 from email.header import decode_header
@@ -15,6 +16,7 @@ class IncomingMail:
     sender_email: str
     body: str
     uid: str
+    gmail_thread_id: str = ""
     privacy_skip: bool = False
     privacy_reason: str = ""
 
@@ -108,6 +110,22 @@ def _parse_message_headers(raw: bytes, fallback_uid: bytes) -> tuple[str, str, s
     return message_id, subject, sender, sender_email
 
 
+def _extract_gmail_thread_id(fetch_metadata: bytes) -> str:
+    match = re.search(rb"X-GM-THRID\s+(\d+)", fetch_metadata or b"")
+    if not match:
+        return ""
+    return format(int(match.group(1)), "x")
+
+
+def _first_fetch_tuple(data) -> tuple[bytes, bytes] | None:
+    for item in data or []:
+        if isinstance(item, tuple) and len(item) >= 2:
+            metadata, payload = item[0], item[1]
+            if isinstance(metadata, bytes) and isinstance(payload, bytes):
+                return metadata, payload
+    return None
+
+
 class EmailFetcher:
     def __init__(self, address: str, password: str, server: str, port: int):
         self.address = address
@@ -145,13 +163,23 @@ class EmailFetcher:
         for uid in uids:
             status, header_data = connection.fetch(
                 uid,
-                "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM)])",
+                "(X-GM-THRID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM)])",
             )
-            if status != "OK" or not header_data or not header_data[0]:
-                continue
+            header_tuple = _first_fetch_tuple(header_data)
+            if status != "OK" or header_tuple is None:
+                status, header_data = connection.fetch(
+                    uid,
+                    "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM)])",
+                )
+                header_tuple = _first_fetch_tuple(header_data)
+                if status != "OK" or header_tuple is None:
+                    continue
+
+            fetch_metadata, header_payload = header_tuple
+            gmail_thread_id = _extract_gmail_thread_id(fetch_metadata)
 
             message_id, subject, sender, sender_email = _parse_message_headers(
-                header_data[0][1],
+                header_payload,
                 uid,
             )
 
@@ -164,6 +192,7 @@ class EmailFetcher:
                         sender_email=sender_email,
                         body="",
                         uid=uid.decode(),
+                        gmail_thread_id=gmail_thread_id,
                         privacy_skip=True,
                         privacy_reason="Sensitive subject matched before reading body",
                     )
@@ -187,6 +216,7 @@ class EmailFetcher:
                     sender_email=sender_email,
                     body=body[:8000],
                     uid=uid.decode(),
+                    gmail_thread_id=gmail_thread_id,
                 )
             )
 

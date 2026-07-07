@@ -70,8 +70,10 @@ Notification behavior:
 
 Gmail app opening:
 - `GMAIL_IOS_ACCOUNT_ID` controls which Gmail account slot the iPhone Gmail app opens.
-- Start with `1`. If Gmail opens but not the same mail, try `2`, then `3`.
+- Use `auto` while testing. On iPhone, the alert tap asks which account ID to try, so you do not need to redeploy for every number.
+- If one number works, you can later set it permanently, like `GMAIL_IOS_ACCOUNT_ID=2`.
 - The dashboard shows the current Gmail iPhone account ID under **Agent Config**.
+- iOS does not let the web app check what happened inside Gmail after Gmail opens.
 
 ## How to verify it is working
 
@@ -125,7 +127,7 @@ python src/main.py --once
 | `GROQ_REQUEST_DELAY_SECONDS` | `2` | Pause between AI calls to avoid rate limits |
 | `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, or `email` |
 | `YOUR_NAME` | - | Helps AI detect personalized outreach |
-| `GMAIL_IOS_ACCOUNT_ID` | `1` | Gmail iPhone app account slot for opening exact alert mails |
+| `GMAIL_IOS_ACCOUNT_ID` | `auto` | Gmail iPhone app account slot for opening exact alert mails; use `auto` while testing |
 
 ## How it works
 

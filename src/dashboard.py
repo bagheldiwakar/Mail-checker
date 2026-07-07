@@ -71,7 +71,9 @@ def render_dashboard(
     else:
         run_rows = '<tr><td colspan="5" class="empty">No check runs yet.</td></tr>'
 
-    gmail_ios_account_id = int(settings_info.get("gmail_ios_account_id", 1) or 1)
+    gmail_ios_account_id = str(settings_info.get("gmail_ios_account_id", 1) or 1).strip().lower()
+    gmail_ios_auto = gmail_ios_account_id == "auto"
+    gmail_ios_app_account_id = 1 if gmail_ios_auto else int(gmail_ios_account_id)
     alert_cards = ""
     if active_alerts:
         for alert in active_alerts:
@@ -83,12 +85,15 @@ def render_dashboard(
             )
             gmail_app_url = _gmail_app_message_url(
                 alert.get("gmail_thread_id"),
-                gmail_ios_account_id,
+                gmail_ios_app_account_id,
             )
+            gmail_thread_id = str(alert.get("gmail_thread_id") or "").strip()
             card_class = "alert-card clickable" if gmail_url else "alert-card"
             open_attrs = (
                 f'role="link" tabindex="0" data-gmail-url="{esc(gmail_url)}" '
                 f'data-gmail-app-url="{esc(gmail_app_url)}" '
+                f'data-gmail-thread-id="{esc(gmail_thread_id)}" '
+                f'data-gmail-account-mode="{esc(gmail_ios_account_id)}" '
                 f'aria-label="Open {esc(profile)} in Gmail" '
                 'onclick="openMailFromCard(this)" '
                 'onkeydown="openMailFromCardKey(event, this)"'
@@ -624,22 +629,16 @@ def render_dashboard(
       if (!gmailUrl) return;
 
       const gmailAppUrl = card.getAttribute('data-gmail-app-url');
+      const gmailThreadId = card.getAttribute('data-gmail-thread-id');
+      const gmailAccountMode = card.getAttribute('data-gmail-account-mode');
       if (isIos && gmailAppUrl) {{
-        let fallbackTimer = window.setTimeout(() => {{
-          window.location.href = gmailUrl;
-        }}, 3000);
-
-        const cancelFallback = () => {{
-          window.clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }};
-
-        window.addEventListener('pagehide', cancelFallback, {{ once: true }});
-        document.addEventListener('visibilitychange', () => {{
-          if (document.hidden) cancelFallback();
-        }}, {{ once: true }});
-
-        window.location.href = gmailAppUrl;
+        if (gmailAccountMode === 'auto' && gmailThreadId) {{
+          const accountId = chooseGmailAccountId();
+          if (!accountId) return;
+          openGmailAppUrl(buildGmailAppUrl(gmailThreadId, accountId), gmailUrl);
+          return;
+        }}
+        openGmailAppUrl(gmailAppUrl, gmailUrl);
         return;
       }}
 
@@ -647,6 +646,42 @@ def render_dashboard(
       if (!opened) {{
         window.location.href = gmailUrl;
       }}
+    }}
+
+    function buildGmailAppUrl(threadId, accountId) {{
+      return 'googlegmail:///cv=' + encodeURIComponent(threadId) +
+        '/accountId=' + encodeURIComponent(accountId) + '&create-new-tab';
+    }}
+
+    function chooseGmailAccountId() {{
+      const previous = localStorage.getItem('gmailIosAccountId') || '1';
+      const value = window.prompt('Gmail account ID to try for this alert:', previous);
+      if (!value) return '';
+      const accountId = String(value).trim();
+      if (!/^\\d+$/.test(accountId) || Number(accountId) < 1) {{
+        setStatus('Use a number like 1, 2, or 3 for the Gmail account ID.');
+        return '';
+      }}
+      localStorage.setItem('gmailIosAccountId', accountId);
+      return accountId;
+    }}
+
+    function openGmailAppUrl(gmailAppUrl, gmailUrl) {{
+      let fallbackTimer = window.setTimeout(() => {{
+        window.location.href = gmailUrl;
+      }}, 3000);
+
+      const cancelFallback = () => {{
+        window.clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }};
+
+      window.addEventListener('pagehide', cancelFallback, {{ once: true }});
+      document.addEventListener('visibilitychange', () => {{
+        if (document.hidden) cancelFallback();
+      }}, {{ once: true }});
+
+      window.location.href = gmailAppUrl;
     }}
 
     function openMailFromCardKey(event, card) {{

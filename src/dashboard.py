@@ -1,31 +1,8 @@
 import html
-from urllib.parse import quote
 
 
-def _gmail_message_url(gmail_thread_id, message_id) -> str:
-    gmail_thread_id = str(gmail_thread_id or "").strip()
-    if gmail_thread_id:
-        return "https://mail.google.com/mail/u/0/#all/" + quote(
-            gmail_thread_id,
-            safe="",
-        )
-
-    message_id = str(message_id or "").strip()
-    if not message_id or message_id.startswith("uid-"):
-        return ""
-    return "https://mail.google.com/mail/u/0/#search/" + quote(
-        f"rfc822msgid:{message_id}",
-        safe="",
-    )
-
-
-def _gmail_app_message_url(gmail_thread_id, account_id: int = 1) -> str:
-    gmail_thread_id = str(gmail_thread_id or "").strip()
-    if not gmail_thread_id:
-        return ""
-    thread_id = quote(gmail_thread_id, safe="")
-    account_id = max(1, int(account_id or 1))
-    return f"googlegmail:///cv={thread_id}/accountId={account_id}&create-new-tab"
+GMAIL_APP_URL = "googlegmail:///"
+GMAIL_WEB_URL = "https://mail.google.com/mail/u/0/#inbox"
 
 
 def render_dashboard(
@@ -71,37 +48,13 @@ def render_dashboard(
     else:
         run_rows = '<tr><td colspan="5" class="empty">No check runs yet.</td></tr>'
 
-    gmail_ios_account_id = str(settings_info.get("gmail_ios_account_id", 1) or 1).strip().lower()
-    gmail_ios_auto = gmail_ios_account_id == "auto"
-    gmail_ios_app_account_id = 1 if gmail_ios_auto else int(gmail_ios_account_id)
     alert_cards = ""
     if active_alerts:
         for alert in active_alerts:
             company = alert.get("company_name") or alert.get("sender") or "Unknown company"
             profile = alert.get("job_profile") or alert.get("subject") or "Job update"
-            gmail_url = _gmail_message_url(
-                alert.get("gmail_thread_id"),
-                alert.get("message_id"),
-            )
-            gmail_app_url = _gmail_app_message_url(
-                alert.get("gmail_thread_id"),
-                gmail_ios_app_account_id,
-            )
-            gmail_thread_id = str(alert.get("gmail_thread_id") or "").strip()
-            card_class = "alert-card clickable" if gmail_url else "alert-card"
-            open_attrs = (
-                f'role="link" tabindex="0" data-gmail-url="{esc(gmail_url)}" '
-                f'data-gmail-app-url="{esc(gmail_app_url)}" '
-                f'data-gmail-thread-id="{esc(gmail_thread_id)}" '
-                f'data-gmail-account-mode="{esc(gmail_ios_account_id)}" '
-                f'aria-label="Open {esc(profile)} in Gmail" '
-                'onclick="openMailFromCard(this)" '
-                'onkeydown="openMailFromCardKey(event, this)"'
-                if gmail_url
-                else ""
-            )
             alert_cards += f"""
-            <article class="{card_class}" {open_attrs}>
+            <article class="alert-card clickable" role="link" tabindex="0" aria-label="Open Gmail for {esc(profile)}" onclick="openGmail()" onkeydown="openGmailKey(event)">
               <div>
                 <div class="alert-topline">{esc(alert.get('category') or 'job_alert')}</div>
                 <h3>{esc(profile)}</h3>
@@ -461,7 +414,6 @@ def render_dashboard(
         <div><strong>Alert email:</strong> {esc(settings_info.get('alert_email'))}</div>
         <div><strong>Your name:</strong> {esc(settings_info.get('your_name') or 'Not set')}</div>
         <div><strong>Groq model:</strong> {esc(settings_info.get('groq_model'))}</div>
-        <div><strong>Gmail iPhone account ID:</strong> {esc(gmail_ios_account_id)}</div>
         <div><strong>Last check:</strong> {esc(last_run_text)} ({esc(last_run_status)})</div>
         <div><strong>Phone notification tokens:</strong> {esc(push_subscriptions)}</div>
       </div>
@@ -624,70 +576,21 @@ def render_dashboard(
       }}
     }}
 
-    function openMailFromCard(card) {{
-      const gmailUrl = card.getAttribute('data-gmail-url');
-      if (!gmailUrl) return;
-
-      const gmailAppUrl = card.getAttribute('data-gmail-app-url');
-      const gmailThreadId = card.getAttribute('data-gmail-thread-id');
-      const gmailAccountMode = card.getAttribute('data-gmail-account-mode');
-      if (isIos && gmailAppUrl) {{
-        if (gmailAccountMode === 'auto' && gmailThreadId) {{
-          const accountId = chooseGmailAccountId();
-          if (!accountId) return;
-          openGmailAppUrl(buildGmailAppUrl(gmailThreadId, accountId), gmailUrl);
-          return;
-        }}
-        openGmailAppUrl(gmailAppUrl, gmailUrl);
+    function openGmail() {{
+      if (isIos) {{
+        window.location.href = '{GMAIL_APP_URL}';
         return;
       }}
-
-      const opened = window.open(gmailUrl, '_blank', 'noopener');
+      const opened = window.open('{GMAIL_WEB_URL}', '_blank', 'noopener');
       if (!opened) {{
-        window.location.href = gmailUrl;
+        window.location.href = '{GMAIL_WEB_URL}';
       }}
     }}
 
-    function buildGmailAppUrl(threadId, accountId) {{
-      return 'googlegmail:///cv=' + encodeURIComponent(threadId) +
-        '/accountId=' + encodeURIComponent(accountId) + '&create-new-tab';
-    }}
-
-    function chooseGmailAccountId() {{
-      const previous = localStorage.getItem('gmailIosAccountId') || '1';
-      const value = window.prompt('Gmail account ID to try for this alert:', previous);
-      if (!value) return '';
-      const accountId = String(value).trim();
-      if (!/^\\d+$/.test(accountId) || Number(accountId) < 1) {{
-        setStatus('Use a number like 1, 2, or 3 for the Gmail account ID.');
-        return '';
-      }}
-      localStorage.setItem('gmailIosAccountId', accountId);
-      return accountId;
-    }}
-
-    function openGmailAppUrl(gmailAppUrl, gmailUrl) {{
-      let fallbackTimer = window.setTimeout(() => {{
-        window.location.href = gmailUrl;
-      }}, 3000);
-
-      const cancelFallback = () => {{
-        window.clearTimeout(fallbackTimer);
-        fallbackTimer = null;
-      }};
-
-      window.addEventListener('pagehide', cancelFallback, {{ once: true }});
-      document.addEventListener('visibilitychange', () => {{
-        if (document.hidden) cancelFallback();
-      }}, {{ once: true }});
-
-      window.location.href = gmailAppUrl;
-    }}
-
-    function openMailFromCardKey(event, card) {{
+    function openGmailKey(event) {{
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
-      openMailFromCard(card);
+      openGmail();
     }}
 
     async function dismissAlert(event, button) {{

@@ -17,8 +17,7 @@ https://mail-checker-1ips.onrender.com
 The dashboard shows:
 - Total checks, alerts sent, emails processed
 - Recent check runs and classified emails
-- Clickable important alert cards that open the matching Gmail thread
-- On iPhone, alert cards try to open the Gmail app before falling back to the web Gmail link
+- Clickable important alert cards that open Gmail
 - Your Google Sheets trigger URL
 - Run Check Now button
 - iPhone home-screen push notifications
@@ -69,11 +68,8 @@ Notification behavior:
 - Email alerts still work through `ALERT_EMAIL`.
 
 Gmail app opening:
-- `GMAIL_IOS_ACCOUNT_ID` controls which Gmail account slot the iPhone Gmail app opens.
-- Use `auto` while testing. On iPhone, the alert tap asks which account ID to try, so you do not need to redeploy for every number.
-- If one number works, you can later set it permanently, like `GMAIL_IOS_ACCOUNT_ID=2`.
-- The dashboard shows the current Gmail iPhone account ID under **Agent Config**.
-- iOS does not let the web app check what happened inside Gmail after Gmail opens.
+- On iPhone, tapping an important alert card opens the Gmail app.
+- On desktop, tapping an important alert card opens Gmail in the browser.
 
 ## How to verify it is working
 
@@ -127,7 +123,6 @@ python src/main.py --once
 | `GROQ_REQUEST_DELAY_SECONDS` | `2` | Pause between AI calls to avoid rate limits |
 | `NOTIFIER_MODE` | `auto` | `auto`, `desktop`, or `email` |
 | `YOUR_NAME` | - | Helps AI detect personalized outreach |
-| `GMAIL_IOS_ACCOUNT_ID` | `auto` | Gmail iPhone app account slot for opening exact alert mails; use `auto` while testing |
 
 ## How it works
 

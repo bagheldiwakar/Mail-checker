@@ -18,6 +18,7 @@ The dashboard shows:
 - Total checks, alerts sent, emails processed
 - Recent check runs and classified emails
 - Clickable important alert cards that open the matching Gmail thread
+- On iPhone, alert cards try to open the Gmail app before falling back to the web Gmail link
 - Your Google Sheets trigger URL
 - Run Check Now button
 - iPhone home-screen push notifications

@@ -19,6 +19,16 @@ def _gmail_message_url(gmail_thread_id, message_id) -> str:
     )
 
 
+def _gmail_app_message_url(gmail_thread_id) -> str:
+    gmail_thread_id = str(gmail_thread_id or "").strip()
+    if not gmail_thread_id:
+        return ""
+    return "googlegmail:///cv=" + quote(
+        gmail_thread_id,
+        safe="",
+    )
+
+
 def render_dashboard(
     settings_info: dict,
     stats: dict,
@@ -71,9 +81,11 @@ def render_dashboard(
                 alert.get("gmail_thread_id"),
                 alert.get("message_id"),
             )
+            gmail_app_url = _gmail_app_message_url(alert.get("gmail_thread_id"))
             card_class = "alert-card clickable" if gmail_url else "alert-card"
             open_attrs = (
                 f'role="link" tabindex="0" data-gmail-url="{esc(gmail_url)}" '
+                f'data-gmail-app-url="{esc(gmail_app_url)}" '
                 f'aria-label="Open {esc(profile)} in Gmail" '
                 'onclick="openMailFromCard(this)" '
                 'onkeydown="openMailFromCardKey(event, this)"'
@@ -606,6 +618,27 @@ def render_dashboard(
     function openMailFromCard(card) {{
       const gmailUrl = card.getAttribute('data-gmail-url');
       if (!gmailUrl) return;
+
+      const gmailAppUrl = card.getAttribute('data-gmail-app-url');
+      if (isIos && gmailAppUrl) {{
+        let fallbackTimer = window.setTimeout(() => {{
+          window.location.href = gmailUrl;
+        }}, 3000);
+
+        const cancelFallback = () => {{
+          window.clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }};
+
+        window.addEventListener('pagehide', cancelFallback, {{ once: true }});
+        document.addEventListener('visibilitychange', () => {{
+          if (document.hidden) cancelFallback();
+        }}, {{ once: true }});
+
+        window.location.href = gmailAppUrl;
+        return;
+      }}
+
       const opened = window.open(gmailUrl, '_blank', 'noopener');
       if (!opened) {{
         window.location.href = gmailUrl;
